@@ -88,14 +88,11 @@ class FileTransferProtocol(basic.LineReceiver):
             self.transport.write(
                 'HASH %s %s %s\n' % (filename, self.factory.files[filename][2],
                                      self.factory.files[filename][1]))
-            self.setRawMode()
-
             for bytes in read_bytes_from_file(
                     os.path.join(self.factory.files_path, filename)):
                 self.transport.write(bytes)
 
             self.transport.write('\r\n')
-            self.setLineMode()
         elif command == 'put':
             try:
                 filename = data[1]
