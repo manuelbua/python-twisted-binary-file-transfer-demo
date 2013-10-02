@@ -75,24 +75,46 @@ class FileTransferProtocol(basic.LineReceiver):
             if not self.factory.files:
                 self.factory.files = self._get_file_list()
 
-            if not filename in self.factory.files:
+            send_all = filename == 'all'
+
+            if not send_all and filename not in self.factory.files:
                 self.transport.write(
-                    'File with filename %s does not exist\n' % (filename))
+                    'File with filename %s does not exist\n' % filename)
                 self.transport.write('ENDMSG\n')
                 return
 
-            display_message('Sending file: %s (%d KB)' % (
-                filename, self.factory.files[filename][1] / 1024))
+            if send_all:
+                display_message(
+                    'Sending all %d files..' % (len(self.factory.files)))
+                self.transport.write("FILES %s\n" % len(self.factory.files))
+            else:
+                self.transport.write("FILES 1\n")
 
-            # send file's path, size and md5 hash
-            self.transport.write(
-                'HASH %s %s %s\n' % (filename, self.factory.files[filename][2],
-                                     self.factory.files[filename][1]))
-            for bytes in read_bytes_from_file(
-                    os.path.join(self.factory.files_path, filename)):
-                self.transport.write(bytes)
+            def send_single(file_name):
+                display_message('Sending file: %s (%d KB, %s)' % (
+                    file_name, self.factory.files[file_name][1] / 1024,
+                    self.factory.files[file_name][2]))
 
-            self.transport.write('\r\n')
+                # send file's path, size and md5 hash
+                self.transport.write(
+                    'HASH %s %s %s\n' % (
+                        file_name, self.factory.files[file_name][2],
+                        self.factory.files[file_name][1]))
+
+                # send binary data
+                for bytes_data in read_bytes_from_file(
+                        os.path.join(self.factory.files_path, file_name)):
+                    self.transport.write(bytes_data)
+
+                # send end marker
+                self.transport.write('\r\n')
+
+            if send_all:
+                for f in self.factory.files:
+                    send_single(f)
+            else:
+                send_single(filename)
+
         elif command == 'put':
             try:
                 filename = data[1]
@@ -105,7 +127,7 @@ class FileTransferProtocol(basic.LineReceiver):
             self.file_data = (filename, file_hash)
 
             # Switch to the raw mode (for receiving binary data)
-            print 'Receiving file: %s' % (filename)
+            print 'Receiving file: %s' % filename
             self.setRawMode()
         elif command == 'help':
             self.transport.write('Available commands:\n\n')
@@ -214,7 +236,7 @@ if __name__ == '__main__':
                       default=1234, help='server listening port')
     parser.add_option('--path', action='store', type='string', dest='path',
                       help='directory where the incoming files are saved',
-                      default='/tmp')
+                      default='/tmp/srv')
     (options, args) = parser.parse_args()
 
     display_message('Listening on port %d, serving files from directory: %s' % (

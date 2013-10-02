@@ -3,7 +3,7 @@ from datetime import datetime
 
 COMMANDS = {
             'list': ('list', 'Displays a list of all the available files'),
-            'get': ('get <remote filename>', 'Downloads a file with a given filename'),
+            'get': ('get <remote filename>', 'Downloads a file with a given filename (use "get all" to retrieve all files)'),
             'put': ('put <local file path> <remote file name>', 'Uploads a file with a given filename'),
             'help': ('help', 'Displays a list of all the available commands'),
             'quit': ('quit', 'Disconnects from the server'),
