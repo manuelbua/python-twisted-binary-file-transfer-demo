@@ -107,7 +107,7 @@ class FileTransferProtocol(basic.LineReceiver):
                     self.transport.write(bytes_data)
 
                 # send end marker
-                self.transport.write('\r\n')
+                #self.transport.write('\r\n')
 
             if send_all:
                 for f in self.factory.files:
