@@ -69,10 +69,10 @@ class FileTransferProtocol(basic.LineReceiver):
                 self._send_txt('Missing filename')
                 return
 
-            if not self.factory.files:
-                self.factory.files = self._get_file_list()
-
             send_all = filename == 'all'
+
+            if send_all or not self.factory.files:
+                self.factory.files = self._get_file_list()
 
             if not send_all and filename not in self.factory.files:
                 self._send_txt(
