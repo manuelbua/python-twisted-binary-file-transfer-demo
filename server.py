@@ -32,10 +32,9 @@ class FileTransferProtocol(basic.LineReceiver):
         self.file_handler = None
         self.file_data = ()
 
-        self.transport.write('Welcome\n')
-        self.transport.write(
-            'Type help for list of all the available commands\n')
-        self.transport.write('ENDMSG\n')
+        self._send_txt('Welcome!\n'
+            'Type help for list of all the available commands'
+        )
 
         display_message('Connection from: %s (%d clients total)' % (
             self.transport.getPeer().host, len(self.factory.clients)))
@@ -59,8 +58,7 @@ class FileTransferProtocol(basic.LineReceiver):
 
         command = data[0].lower()
         if not command in COMMANDS:
-            self.transport.write('Invalid command\n')
-            self.transport.write('ENDMSG\n')
+            self._send_txt('Invalid command')
             return
         if command == 'list':
             self._send_list_of_files()
@@ -68,8 +66,7 @@ class FileTransferProtocol(basic.LineReceiver):
             try:
                 filename = data[1]
             except IndexError:
-                self.transport.write('Missing filename\n')
-                self.transport.write('ENDMSG\n')
+                self._send_txt('Missing filename')
                 return
 
             if not self.factory.files:
@@ -78,9 +75,8 @@ class FileTransferProtocol(basic.LineReceiver):
             send_all = filename == 'all'
 
             if not send_all and filename not in self.factory.files:
-                self.transport.write(
-                    'File with filename %s does not exist\n' % filename)
-                self.transport.write('ENDMSG\n')
+                self._send_txt(
+                    'File with filename %s does not exist' % filename)
                 return
 
             if send_all:
@@ -95,7 +91,7 @@ class FileTransferProtocol(basic.LineReceiver):
                     file_name, self.factory.files[file_name][1] / 1024,
                     self.factory.files[file_name][2]))
 
-                # send file's path, size and md5 hash
+                # send file's name, size and md5 hash
                 self.transport.write(
                     'HASH %s %s %s\n' % (
                         file_name, self.factory.files[file_name][2],
@@ -105,9 +101,6 @@ class FileTransferProtocol(basic.LineReceiver):
                 for bytes_data in read_bytes_from_file(
                         os.path.join(self.factory.files_path, file_name)):
                     self.transport.write(bytes_data)
-
-                # send end marker
-                #self.transport.write('\r\n')
 
             if send_all:
                 for f in self.factory.files:
@@ -120,8 +113,7 @@ class FileTransferProtocol(basic.LineReceiver):
                 filename = data[1]
                 file_hash = data[2]
             except IndexError:
-                self.transport.write('Missing filename or file MD5 hash\n')
-                self.transport.write('ENDMSG\n')
+                self._send_txt('Missing filename or file MD5 hash')
                 return
 
             self.file_data = (filename, file_hash)
@@ -130,15 +122,16 @@ class FileTransferProtocol(basic.LineReceiver):
             print 'Receiving file: %s' % filename
             self.setRawMode()
         elif command == 'help':
-            self.transport.write('Available commands:\n\n')
+            help_text = 'Available commands:\n\n'
 
             for key, value in COMMANDS.iteritems():
-                self.transport.write('%s - %s\n' % (value[0], value[1]))
+                help_text += '%s - %s\n' % (value[0], value[1])
 
-            self.transport.write('ENDMSG\n')
+            self._send_txt(help_text)
         elif command == 'quit':
             self.transport.loseConnection()
 
+    # TODO, fix everything
     def rawDataReceived(self, data):
         filename = self.file_data[0]
         file_path = os.path.join(self.factory.files_path, filename)
@@ -158,18 +151,15 @@ class FileTransferProtocol(basic.LineReceiver):
             self.file_handler = None
 
             if validate_file_md5_hash(file_path, self.file_data[1]):
-                self.transport.write(
-                    'File was successfully transfered and saved\n')
-                self.transport.write('ENDMSG\n')
+                self._send_txt('File was successfully transfered and saved')
 
                 display_message(
                     'File %s has been successfully transfered' % (filename))
             else:
                 os.unlink(file_path)
-                self.transport.write(
+                self._send_txt(
                     'File was successfully transfered but not saved, '
-                    'due to invalid MD5 hash\n')
-                self.transport.write('ENDMSG\n')
+                    'due to invalid MD5 hash')
 
                 display_message(
                     'File %s has been successfully transfered, '
@@ -178,16 +168,22 @@ class FileTransferProtocol(basic.LineReceiver):
         else:
             self.file_handler.write(data)
 
+
+    def _send_txt(self,data):
+        self.transport.write("TXT %d\n" % len(data))
+        self.transport.write("%s" % data)
+
+    #def _send_file(self,data):
+
     def _send_list_of_files(self):
         files = self._get_file_list()
         self.factory.files = files
 
-        self.transport.write('Files (%d): \n\n' % len(files))
+        files_list = 'Files (%d): \n\n' % len(files)
         for key, value in files.iteritems():
-            self.transport.write(
-                '- %s (%d.2 KB)\n' % (key, (value[1] / 1024.0)))
+            files_list += '- %s (%d.2 KB)\n' % (key, (value[1] / 1024.0))
 
-        self.transport.write('ENDMSG\n')
+        self._send_txt(files_list)
 
     def _get_file_list(self):
         """ Returns a list of the files in the specified directory as a
