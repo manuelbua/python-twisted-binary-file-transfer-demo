@@ -129,6 +129,7 @@ class FileTransferProtocol(basic.LineReceiver):
 
             self._send_txt(help_text)
         elif command == 'quit':
+            self._send_txt("Bye!")
             self.transport.loseConnection()
 
     # TODO, fix everything
